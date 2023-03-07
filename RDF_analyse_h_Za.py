@@ -2,8 +2,6 @@ from MakeRDF import MakeRDF
 from time import time
 import ROOT
 
-#ROOT.gSystem.Load("./MakeRDF_cxx.so")
-
 ROOT.gInterpreter.Declare("""
 
 RVec<TruthParticle> stable_truth_photons_func(RVec<TruthParticle> truth_particles)
@@ -197,37 +195,53 @@ if __name__ == "__main__":
     start = time()
     files = ("/Users/edwardfinkelstein/ATLAS_axion/user.kschmied.28655874._000025.LGNTuple.root",)
 
-    df = MakeRDF(files, 8)
+    df = MakeRDF(files, 8) #Create the dataframe
     
+#    Book a column for truth-photons with status code 1
     stable_truth_photons = df.Define("stable_truth_photons","stable_truth_photons_func(truth_particles)")
     
+#    Book a column for the pt of the stable truth photons (in GeV)
     stable_truth_photons_pt = stable_truth_photons.Define("stable_truth_photons_pt", "stable_truth_photons_pt_func(stable_truth_photons)")
     
+#    Book a column for the pseudo-rapidity (eta) of the stable truth photons
     stable_truth_photons_eta = stable_truth_photons.Define("stable_truth_photons_eta","stable_truth_photons_eta_func(stable_truth_photons)")
     
+#    Book a column for truth-leptons (assumed stable)
     stable_truth_leptons = df.Define("stable_truth_leptons","stable_truth_leptons_func(truth_particles)")
     
+#    Keep events where the stable truth leptons pass preselection cuts (in GeV)
     passed_truth_leptons = stable_truth_leptons.Filter("passed_truth_leptons_func(stable_truth_leptons)")
     
+#    Book a column for the pt of the stable truth leptons that passed
     passed_truth_leptons_pt = passed_truth_leptons.Define("passed_truth_leptons_pt", "passed_truth_leptons_pt_func(stable_truth_leptons)")
     
+#    Book a column for the eta of the stable truth leptons that passed
     passed_truth_leptons_eta = passed_truth_leptons.Define("passed_truth_leptons_eta","passed_truth_leptons_eta_func(stable_truth_leptons)")
     
+#    Book a column for photons that pass selected_photons_func
     selected_photons = df.Define("selected_photons","selected_photons_func(photons)")
     
+#    Book a column for the pt of the selected photons
     selected_photons_pt = selected_photons.Define("selected_photons_pt","selected_photons_pt_func(selected_photons)")
 
+#    Book a column for the pt of the selected photons
     selected_photons_eta = selected_photons.Define("selected_photons_eta","selected_photons_eta_func(selected_photons)")
     
+#    Filter events where the number of photons that passed isn't 2
     passed_selected_photons = selected_photons.Filter("selected_photons.size()==2")
     
+#    Book a column for the pt of the events where # of selected photons = 2 (in GeV)
     passed_selected_photons_pt = passed_selected_photons.Define("passed_selected_photons_pt","passed_selected_photons_pt_func(selected_photons)")
-    
+ 
+ #    Book a column for the eta of the events where # of selected photons = 2
     passed_selected_photons_eta = passed_selected_photons.Define("passed_selected_photons_eta","passed_selected_photons_eta_func(selected_photons)")
     
+#    Get the number of events that passed the photon selection
     nEntriesAfterCuts = passed_selected_photons_eta.Count()
     print(f"# events for nominal = {nEntriesAfterCuts.GetValue()}")
     
+#    A list of all of the Histograms we want to create. The event loop still
+#    hasn't been triggered yet!
     histos = (
         stable_truth_photons_pt.Histo1D(("stable_truth_photons_pt", "histTitle", 20, 0, 200), "stable_truth_photons_pt"),
         stable_truth_photons_eta.Histo1D(("stable_truth_photons_eta", "histTitle", 40, -6, 6), "stable_truth_photons_eta"),
@@ -243,10 +257,10 @@ if __name__ == "__main__":
         passed_selected_photons_eta.Histo1D(("passed_selected_photons_eta", "histTitle", 40, -6, 6), "passed_selected_photons_eta"),
     )
     
-    for h in histos:
-        c1 = ROOT.TCanvas("","",800, 700)
-        h.Draw("same")
-        c1.SaveAs(h.GetName()+".png");
+    for h in histos: #For each histogram
+        c1 = ROOT.TCanvas("","",800, 700) #Create a new canvas
+        h.Draw("same") #Draw the histogram
+        c1.SaveAs(h.GetName()+".png"); #Save the histogram.
     
-    end = time()
+    end = time() #done
     print(f"Time taken = {end-start:0.3f} seconds")

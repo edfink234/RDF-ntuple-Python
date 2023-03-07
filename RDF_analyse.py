@@ -4,6 +4,11 @@ import ROOT
 
 #ROOT.gSystem.Load("./MakeRDF_cxx.so")
 
+"""
+Declaring the functions that we use for Define and Filter
+in this analysis. The bool functions are used in calls to
+Filter, and the rest are used in calls to Define.
+"""
 ROOT.gInterpreter.Declare("""
 bool photon_selection(Photon& photon)
 {
@@ -249,37 +254,51 @@ if __name__ == "__main__":
     start = time()
     files = ("/Users/edwardfinkelstein/ATLAS_axion/user.kschmied.28655874._000025.LGNTuple.root",)
     ROOT.Event.systematics = {"EG_RESOLUTION_ALL__1down"};
-    df = MakeRDF(files)
+    df = MakeRDF(files) #Create the dataframe
 #    df.Describe().Print()
-
+    
+#    An example of filter. In this case, no events are filtered
+#    since mc is true
     firstTriggerCut = df.Define("mc", "true").Filter("mc || std::find(trigger_passed_triggers.begin(), trigger_passed_triggers.end(), \"HLT_hi_upc_FgapAC3_hi_gg_upc_L1TAU1_TE4_VTE200\") != trigger_passed_triggers.end()")
     
 #    print(firstTriggerCut.Count().GetValue())
 
+#    Book columns for selected photons and selected tracks using
+#    functions defined above
     selected_photons_and_tracks = firstTriggerCut.Define("selected_photons","selected_photons_func(photons)")\
                        .Define("selected_tracks", "selected_tracks_func(tracks)")
     
+#    Books columns for selected truth_particles
     truth_photons = firstTriggerCut.Define("truth_photons", "truth_photons_func(truth_particles)")
     
 #    truth_photons.Describe().Print()
-    
+#    Book a filtration of truth_photons; for the events that pass
+#    book columns for the p_t and mass
     truth_candidates = truth_photons.Filter("truth_candidates_func(truth_photons)")\
                                     .Define("truth_candidates_pt", "truth_candidates_pt_func(truth_photons)")\
                                     .Define("truth_candidates_mass", "truth_candidates_mass_func(truth_photons)")
     
+#    Filter events that don't have exactly two photons; for the events
+#    that pass, define columns for the pt, mass, number of selected tracks
+#    and the pt and eta of the selected tracks
     diphotons_and_tracks = selected_photons_and_tracks.Filter("selected_photons.size() == 2").Define("diphotons_pt", "diphotons_pt_func(selected_photons)")\
            .Define("diphotons_mass", "diphotons_mass_func(selected_photons)")\
            .Define("num_tracks", "selected_tracks.size()")\
            .Define("selected_tracks_pt", "selected_tracks_pt_func(selected_tracks)")\
            .Define("selected_tracks_eta", "selected_tracks_eta_func(selected_tracks)")
     
+#    Filter events that have tracks or diphoton inv mass <= 5 GeV,
+#    then define columns for the diphoton pt, inv mass, number of
+#    tracks, selected tracks pt and eta.
     no_tracks_inv_mass = diphotons_and_tracks.Filter("no_tracks_inv_mass_func(selected_tracks, selected_photons)")\
            .Define("diphotons_pt_no_tracks_inv_mass", "diphotons_pt_no_tracks_inv_mass_func(selected_photons)")\
            .Define("diphotons_mass_no_tracks_inv_mass", "diphotons_mass_no_tracks_inv_mass_func(selected_photons)")\
            .Define("num_tracks_no_tracks_inv_mass", "selected_tracks.size()")\
            .Define("selected_tracks_pt_no_tracks_inv_mass", "selected_tracks_pt_no_tracks_inv_mass_func(selected_tracks)")\
            .Define("selected_tracks_eta_no_tracks_inv_mass", "selected_tracks_eta_no_tracks_inv_mass_func(selected_tracks)")
-            
+         
+#    Filter events that have tracks, then define columns for diphoton pt,
+#    inv mass, number of tracks, selected tracks pt and eta.
     no_tracks = diphotons_and_tracks.Filter("selected_tracks.empty()")\
            .Define("diphotons_pt_no_tracks","diphotons_pt_no_tracks_func(selected_photons)")\
            .Define("diphotons_mass_no_tracks","diphotons_mass_no_tracks_func(selected_photons)")\
@@ -287,6 +306,8 @@ if __name__ == "__main__":
            .Define("selected_tracks_pt_no_tracks","selected_tracks_pt_no_tracks_func(selected_tracks)")\
            .Define("selected_tracks_eta_no_tracks","selected_tracks_eta_no_tracks_func(selected_tracks)")
     
+#    A list of all of the Histograms we want to create. The event loop still
+#    hasn't been triggered yet!
     histos = (
         truth_candidates.Histo1D(("TruthRecoPhotonPt", "TruthRecoPhotonPt", 20, 0, 25), "truth_candidates_pt"),
         truth_candidates.Histo1D(("TruthRecoPhotonPtTight", "TruthRecoPhotonPtTight", 100, 0, 10), "truth_candidates_pt"),
@@ -325,20 +346,22 @@ if __name__ == "__main__":
     resultmaps = []
     histNames = []
     for h in histos:
+#        Appending a map that contains the nominal and varied Histograms
+#        for the systematics in Event.systematics to the list resultmaps
         resultmaps.append(ROOT.RDF.Experimental.VariationsFor(h))
         histNames.append(h.GetName())
     
-    for i in range(len(resultmaps)):
-        for var in resultmaps[i].GetKeys():
-            c1 = ROOT.TCanvas("","",800, 700)
-            resultmaps[i][var].Draw("same")
+    for i in range(len(resultmaps)): #For map of histograms
+        for var in resultmaps[i].GetKeys(): #For each varied histogram in the map
+            c1 = ROOT.TCanvas("","",800, 700) #Create a new canvas
+            resultmaps[i][var].Draw("same") #Draw the histogram
             string = str(var).replace(":","")
             
-            c1.SaveAs((string+histNames[i]+".png"))
+            c1.SaveAs((string+histNames[i]+".png")) #Save the histogram.
             if histNames[i] == "02MassCutTrackingNumTracks":
                 print(f"# of events for {var} = {resultmaps[i][var].GetEntries()}")
     
-    end = time()
+    end = time() #done
     print(f"Time taken = {end-start:0.3f} seconds")
     
     

@@ -2,12 +2,15 @@ import ROOT
 import os
 from array import array
 ROOT.gInterpreter.ProcessLine('#include "RDFObjects.h"')
-#ROOT.gSystem.Load("./RDFObjects_cxx.so")
 
 #@ROOT.Numba.Declare(['RVec<int>', 'RVec<int>', 'RVec<int>', 'RVec<int>', 'RVec<float>', 'RVec<float>', 'RVec<float>', 'RVec<float>', 'RVec<float>', 'RVec<float>'], 'int')
 #def make_truth_particles(mc_pdg_id, mc_barcode, mc_parent_barcode, mc_status, mc_pt, mc_charge, mc_eta, mc_phi, mc_e, mc_mass):
 #    return 1
 
+"""
+Declaring the functions that we use for Define and Vary
+in the MakeRDF function
+"""
 ROOT.gInterpreter.Declare("""
 
 namespace Event
@@ -230,24 +233,33 @@ RVec<RVec<Electron>> ElectronVariation(RVec<Electron>& electrons, RVec<float>& e
 #@ROOT.Numba.Declare(['RVec<float>', 'int'], 'RVec<float>')
 #def pypowarray(numpyvec, pow):
 #    return numpyvec**pow
-
+'''
+Class to store Tree information that will be passed
+to the RDataFrame constructor in the MakeRDF function
+'''
 class RDFTree:
     __chain = ROOT.TChain("physics")
     __event_info_chain = ROOT.TChain("full_event_info")
 
 def MakeRDF(files, numThreads = -1):
+#    only enable multi-threading if the user specifies a number greater than 0
     if numThreads > 0:
         ROOT.ROOT.EnableImplicitMT(numThreads)
     
+#    Add the files the user passes in to the TChains of RDFTree
     for file in files:
         RDFTree._RDFTree__chain.Add(file)
         RDFTree._RDFTree__event_info_chain.Add(file)
     
+#    Horizontally append __event_info_chain to __chain
     RDFTree._RDFTree__chain.AddFriend(RDFTree._RDFTree__event_info_chain)
 #    print( tuple(ROOT.Event.systematics))
     
+#    Create the RDataFrame with the TTree constructor via __chain
     df = ROOT.RDataFrame(RDFTree._RDFTree__chain)#.Define('array', 'ROOT::RVecF{1.,2.,3.}')
     
+#    Define the relevant object columns and systematic variations we want for our
+#    analysis
     df =  df.Define("truth_particles", "load_truth_particles(mc_pdg_id, mc_barcode, mc_parent_barcode, mc_status, mc_pt, mc_charge, mc_eta, mc_phi, mc_e, mc_mass)")\
             .Define("electrons", "load_electrons(electron_charge, electron_pt, electron_e, electron_eta, electron_phi, /*electron_id,*/ electron_isolation, electron_d0, electron_z0 /*, electron_id_medium*/)")\
             .Define("muons", "load_muons(muon_charge, muon_pt, muon_e, muon_eta, muon_phi)")\
