@@ -229,34 +229,17 @@ RVec<RVec<Electron>> ElectronVariation(RVec<Electron>& electrons, RVec<float>& e
 }
 
 """)
-    
-#@ROOT.Numba.Declare(['RVec<float>', 'int'], 'RVec<float>')
-#def pypowarray(numpyvec, pow):
-#    return numpyvec**pow
-'''
-Class to store Tree information that will be passed
-to the RDataFrame constructor in the MakeRDF function
-'''
-class RDFTree:
-    __chain = ROOT.TChain("physics")
-    __event_info_chain = ROOT.TChain("full_event_info")
 
 def MakeRDF(files, numThreads = -1):
 #    only enable multi-threading if the user specifies a number greater than 0
     if numThreads > 0:
         ROOT.ROOT.EnableImplicitMT(numThreads)
     
-#    Add the files the user passes in to the TChains of RDFTree
-    for file in files:
-        RDFTree._RDFTree__chain.Add(file)
-        RDFTree._RDFTree__event_info_chain.Add(file)
-    
-#    Horizontally append __event_info_chain to __chain
-    RDFTree._RDFTree__chain.AddFriend(RDFTree._RDFTree__event_info_chain)
-#    print( tuple(ROOT.Event.systematics))
-    
-#    Create the RDataFrame with the TTree constructor via __chain
-    df = ROOT.RDataFrame(RDFTree._RDFTree__chain)#.Define('array', 'ROOT::RVecF{1.,2.,3.}')
+    x = ROOT.RDF.Experimental.RDatasetSpec()
+    r = ROOT.RDF.Experimental.RSample("myPhysicsDf", "physics", files)
+    x.AddSample(r)
+    x.WithGlobalFriends("full_event_info", files)
+    df = ROOT.RDataFrame(x)
     
 #    Define the relevant object columns and systematic variations we want for our
 #    analysis
